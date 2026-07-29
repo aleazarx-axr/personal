@@ -35,10 +35,9 @@ exports.getMemos = async (req, res) => {
             SELECT m.id, m.memo_number AS memoNumber, m.subject, m.created_at AS date, 
                    m.attachment, m.additional_attachments, m.status, m.remarks, r.role_name AS issuer 
             FROM Memoranda m LEFT JOIN Users u ON m.issuer_id = u.id LEFT JOIN Roles r ON u.role_id = r.id 
-            WHERE m.is_archived = ? ORDER BY m.created_at DESC`, [isArchivedView ? 1 : 0]);
+            WHERE COALESCE(m.is_archived, 0) = ? ORDER BY m.created_at DESC`, [isArchivedView ? 1 : 0]);
         res.status(200).json(memos);
     } catch (error) { 
-        // 👇 ADD THIS LINE TO REVEAL THE BUG 👇
         console.error("🔥 ERROR IN GET MEMOS:", error); 
         res.status(500).json({ message: 'Internal server error.' }); 
     }
