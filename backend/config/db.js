@@ -16,11 +16,11 @@ const pool = mysql.createPool({
 // Test the connection immediately when the server starts
 pool.getConnection()
     .then(connection => {
-        console.log('✅ Successfully connected to the WMSU MySQL Database.');
+        console.log('Successfully connected to the WMSU MySQL Database.');
         connection.release();
     })
     .catch(err => {
-        console.error('❌ Database connection failed:', err.message);
+        console.error('Database connection failed:', err.message);
     });
 
 module.exports = pool;

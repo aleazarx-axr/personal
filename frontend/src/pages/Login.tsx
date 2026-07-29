@@ -1,6 +1,7 @@
 // src/pages/Login.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ export const Login: React.FC = () => {
 
     try {
       // Ensure this port (5000) matches your backend server.js port
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -34,7 +35,7 @@ export const Login: React.FC = () => {
 
       // Redirect based on the Role returned from the MySQL Database
       if (data.user.role === 'Admin' || data.user.role === 'Superuser') {
-        navigate('/admin');
+        navigate('/dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -48,75 +49,91 @@ export const Login: React.FC = () => {
     }
   };
 
+  const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 font-sans px-4">
-      <div className="max-w-md w-full bg-white p-6 md:p-8 border border-gray-300 shadow-sm rounded-none">
+      
+      {/* Main Login Card with the Signature Crimson Top Border */}
+      <div className="max-w-md w-full bg-white border border-gray-200 shadow-xl rounded-xl relative overflow-hidden">
         
-        {/* Branding Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-             <img src="/wmsu-logo.png" alt="WMSU Logo" className="w-16 h-16 object-contain" />
+        <div className="p-8 sm:p-10">
+          
+          {/* Branding Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+               <img src="/wmsu-logo.png" alt="WMSU Logo" className="w-16 h-16 object-contain" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900">MyWMSU Ipil</h1>
+            <p className="text-sm text-gray-500 mt-1">Sign in to the Administrative Portal</p>
           </div>
-          <h1 className="text-2xl font-bold text-[#9B1C1C] uppercase tracking-wide">MyWMSU Ipil</h1>
-          <p className="text-sm text-gray-500 mt-2">Sign in to the Administrative Portal</p>
+
+          {/* Error Alert */}
+          {error && (
+            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center rounded-md">
+              <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
+              <span className="font-medium">{error}</span>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Email Address
+              </label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                placeholder="admin@wmsu.edu.ph"
+                required 
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Password
+              </label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+                placeholder="••••••••"
+                required 
+                disabled={loading}
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className={`w-full h-[42px] mt-2 flex items-center justify-center text-sm font-medium rounded-md shadow-sm transition-colors ${
+                loading 
+                  ? 'bg-gray-100 border border-gray-300 text-gray-400 cursor-not-allowed' 
+                  : 'bg-[#9B1C1C] hover:bg-[#7a1515] text-white'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          {/* Footer info */}
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-500 font-medium">
+            Western Mindanao State University <br/> Ipil Campus
+          </div>
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <div className="mb-6 p-3 bg-red-50 border border-red-200 text-[#9B1C1C] text-sm text-center font-medium rounded-none">
-            {error}
-          </div>
-        )}
-
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-tight">
-              Email Address
-            </label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 border border-gray-300 bg-gray-50 focus:outline-none focus:border-[#9B1C1C] focus:ring-1 focus:ring-[#9B1C1C] rounded-none transition-all"
-              placeholder="admin@wmsu.edu.ph"
-              required 
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-tight">
-              Password
-            </label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 bg-gray-50 focus:outline-none focus:border-[#9B1C1C] focus:ring-1 focus:ring-[#9B1C1C] rounded-none transition-all"
-              placeholder="••••••••"
-              required 
-              disabled={loading}
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            className={`w-full p-3 font-bold uppercase tracking-widest transition-colors rounded-none shadow-sm ${
-              loading 
-                ? 'bg-gray-400 cursor-not-allowed text-white' 
-                : 'bg-[#9B1C1C] hover:bg-[#7a1515] text-white'
-            }`}
-          >
-            {loading ? 'Verifying...' : 'Sign In'}
-          </button>
-        </form>
-
-        {/* Footer info */}
-        <div className="mt-8 pt-6 border-t border-gray-200 text-center text-[10px] text-gray-400 uppercase tracking-widest">
-          Western Mindanao State University - Ipil Campus
-        </div>
       </div>
     </div>
   );

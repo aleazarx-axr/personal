@@ -1,0 +1,12 @@
+.env
+.env.*
+*.env
+node_modules/
+google-credentials.json
+backend/uploads/
+backend/setup_db.js
+backend/init_db.sql
+backend/sql_queries.txt
+backend/create_admin.js
+*copy*
+*Copy*
