@@ -18,12 +18,26 @@ const apiRoutes = require('./routes/apiRoutes');
 app.use('/api', apiRoutes);
 
 // --- SERVE FRONTEND ---
-// Serve static files from the React frontend build
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Since Hostinger's folder structure can vary based on how Git was deployed,
+// we will dynamically find the dist folder.
+const fs = require('fs');
+const possiblePaths = [
+    path.join(__dirname, '../frontend/dist'), // Standard Git repo structure
+    path.join(__dirname, 'frontend/dist'),    // Repo deployed into this folder
+    path.join(__dirname, 'dist'),             // Just the dist folder was copied here
+    path.join(__dirname, '../dist')
+];
+
+let frontendDist = possiblePaths.find(p => fs.existsSync(p));
+if (!frontendDist) {
+    frontendDist = possiblePaths[0]; // Fallback so it throws a clear ENOENT error
+}
+
+app.use(express.static(frontendDist));
 
 // Any route that doesn't match an API route will send back the React index.html
 app.use((req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+    res.sendFile(path.join(frontendDist, 'index.html'));
 });
 
 // --- START SERVER ---
