@@ -17,8 +17,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const apiRoutes = require('./routes/apiRoutes');
 app.use('/api', apiRoutes);
 
-app.get('/', (req, res) => {
-    res.send('WMSU Portal API is running!');
+// --- SERVE FRONTEND ---
+// Serve static files from the React frontend build
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// Any route that doesn't match an API route will send back the React index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 // --- START SERVER ---
