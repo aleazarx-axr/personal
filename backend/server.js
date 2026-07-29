@@ -18,20 +18,8 @@ const apiRoutes = require('./routes/apiRoutes');
 app.use('/api', apiRoutes);
 
 // --- SERVE FRONTEND ---
-// Since Hostinger's folder structure can vary based on how Git was deployed,
-// we will dynamically find the dist folder.
-const fs = require('fs');
-const possiblePaths = [
-    path.join(__dirname, '../frontend/dist'), // Standard Git repo structure
-    path.join(__dirname, 'frontend/dist'),    // Repo deployed into this folder
-    path.join(__dirname, 'dist'),             // Just the dist folder was copied here
-    path.join(__dirname, '../dist')
-];
-
-let frontendDist = possiblePaths.find(p => fs.existsSync(p));
-if (!frontendDist) {
-    frontendDist = possiblePaths[0]; // Fallback so it throws a clear ENOENT error
-}
+// The frontend React app is now built directly into the backend's 'public' folder.
+const frontendDist = path.join(__dirname, 'public');
 
 app.use(express.static(frontendDist));
 
