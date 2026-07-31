@@ -33,13 +33,13 @@ exports.getMemos = async (req, res) => {
         const isArchivedView = req.query.archived === 'true';
         const [memos] = await db.execute(`
             SELECT m.id, m.memo_number AS memoNumber, m.subject, m.created_at AS date, 
-                   m.attachment, m.additional_attachments, m.status, m.remarks, r.role_name AS issuer 
+                   m.attachment, m.additional_attachments, m.status, m.content AS remarks, r.role_name AS issuer 
             FROM Memoranda m LEFT JOIN Users u ON m.issuer_id = u.id LEFT JOIN Roles r ON u.role_id = r.id 
             WHERE COALESCE(m.is_archived, 0) = ? ORDER BY m.created_at DESC`, [isArchivedView ? 1 : 0]);
         res.status(200).json(memos);
     } catch (error) { 
         console.error("🔥 ERROR IN GET MEMOS:", error); 
-        res.status(500).json({ message: 'Internal server error.' }); 
+        res.status(500).json({ message: 'Internal server error.', error: error.message }); 
     }
 };
 
@@ -93,7 +93,7 @@ exports.updateMemo = async (req, res) => {
             newFiles.forEach((file, index) => { finalExtraFiles.push({ url: `/uploads/memoranda/${file.filename}`, remark: rems[index] || '' }); });
         }
         
-        let query = `UPDATE Memoranda SET subject=?, remarks=?, additional_attachments=?`;
+        let query = `UPDATE Memoranda SET subject=?, content=?, additional_attachments=?`;
         let params = [subject, remarks || '', JSON.stringify(finalExtraFiles.slice(0, 3))];
 
         if (req.files && req.files['attachment']) { 

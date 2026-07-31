@@ -144,10 +144,15 @@ export const Memoranda: React.FC = () => {
         fetch(`${import.meta.env.VITE_API_URL}/api/memoranda${isArchivedView ? '?archived=true' : ''}`),
         fetch(`${import.meta.env.VITE_API_URL}/api/templates`)
       ]);
-      if (docRes.ok) setDocuments(await docRes.json());
+      if (docRes.ok) {
+        setDocuments(await docRes.json());
+      } else {
+        const errorData = await docRes.json();
+        showNotify(`Server Error: ${errorData.error || 'Failed to fetch memos'}`, "error");
+      }
       if (tplRes.ok) setTemplates(await tplRes.json());
-    } catch (err) { 
-      showNotify("Failed to connect to server.", "error"); 
+    } catch (err: any) { 
+      showNotify(`Failed to connect to server: ${err.message}`, "error"); 
     } finally { 
       setLoading(false); 
     }
