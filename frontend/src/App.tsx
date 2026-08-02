@@ -11,6 +11,10 @@ import {
 // Page Imports
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
+import { SetupPassword } from "./pages/SetupPassword";
+import { ResetPassword } from "./pages/ResetPassword";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { Profile } from "./pages/Profile";
 import { UserManagement } from "./pages/UserManagement";
 import { ActivityLogs } from "./pages/ActivityLogs";
 import { Dashboard } from "./pages/Dashboard";
@@ -24,6 +28,7 @@ import { ClassroomMonitoring } from "./pages/ClassroomMonitoring";
 import { TeachingLoads } from "./pages/TeachingLoads";
 import { MasterScheduler } from "./pages/MasterScheduler";
 import { AssessmentGenerator } from "./pages/AssessmentGenerator";
+import { PortalLayout } from "./components/PortalLayout";
 
 // --- RBAC Middleware Component ---
 // This checks if a user is logged in AND if they have the correct role.
@@ -60,43 +65,10 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/setup-password" element={<SetupPassword />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* Protected Admin Routes (Superuser & Admin only) */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={["Superuser", "Admin"]}>
-              <UserManagement />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Protected General Dashboard (For all valid logged-in users) */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute
-              allowedRoles={["Superuser", "Admin", "Staff", "Student"]}
-            >
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/memoranda"
-          element={
-            <ProtectedRoute
-              allowedRoles={["Superuser", "Admin", "Staff", "Student"]}
-            >
-              <Memoranda />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route path="/document-tracking" element={<DocumentLogging />} />
-        <Route path="/settings" element={<Settings />} />
 
         {/* Fallback for blocked access */}
         <Route
@@ -110,23 +82,62 @@ function App() {
           }
         />
 
-        <Route path="/logs" element={<ActivityLogs />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/news-manager" element={<NewsManager />} />
-        <Route path="/calendar-manager" element={<CalendarManager />} />
-        <Route path="/officials-manager" element={<OfficialsManager />} />
-        <Route path="/classroom-monitoring" element={<ClassroomMonitoring />} />
-        <Route path="/teaching-loads" element={<TeachingLoads />} />
-        <Route path="/master-scheduler" element={<MasterScheduler />} />
+        {/* --- PORTAL LAYOUT ROUTES --- */}
+        <Route element={<PortalLayout />}>
+          {/* Protected Admin Routes (Superuser & Admin only) */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={["Superuser", "Admin"]}>
+                <UserManagement />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/assessment"
-          element={
-            <ProtectedRoute allowedRoles={["Superuser", "Admin", "Staff"]}>
-              <AssessmentGenerator />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected General Dashboard (For all valid logged-in users) */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute
+                allowedRoles={["Superuser", "Admin", "Staff", "Student"]}
+              >
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/memoranda"
+            element={
+              <ProtectedRoute
+                allowedRoles={["Superuser", "Admin", "Staff", "Student"]}
+              >
+                <Memoranda />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/document-tracking" element={<DocumentLogging />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
+
+          <Route path="/logs" element={<ActivityLogs />} />
+          <Route path="/news-manager" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><NewsManager /></ProtectedRoute>} />
+          <Route path="/calendar-manager" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><CalendarManager /></ProtectedRoute>} />
+          <Route path="/officials-manager" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><OfficialsManager /></ProtectedRoute>} />
+          <Route path="/classroom-monitoring" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><ClassroomMonitoring /></ProtectedRoute>} />
+          <Route path="/teaching-loads" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><TeachingLoads /></ProtectedRoute>} />
+          <Route path="/master-scheduler" element={<ProtectedRoute allowedRoles={["Superuser", "Admin"]}><MasterScheduler /></ProtectedRoute>} />
+
+          <Route
+            path="/assessment"
+            element={
+              <ProtectedRoute allowedRoles={["Superuser", "Admin"]}>
+                <AssessmentGenerator />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
       </Routes>
     </Router>
   );

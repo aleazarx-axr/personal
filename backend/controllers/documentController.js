@@ -13,6 +13,7 @@ exports.getLogs = async (req, res) => {
 exports.createLog = async (req, res) => {
     const { date_received, category, document_type, subject, sender, receiver, status, remarks } = req.body;
     const attachmentPath = req.file ? `/uploads/documents/${req.file.filename}` : null;
+    let parsedDate = date_received ? date_received : null;
 
     try {
         const currentYear = new Date().getFullYear();
@@ -22,7 +23,7 @@ exports.createLog = async (req, res) => {
         await db.execute(
             `INSERT INTO DocumentTracking (tracking_number, category, date_received, document_type, subject, sender, receiver, status, remarks, attachment) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [tracking_number, category || 'Incoming', date_received, document_type, subject, sender, receiver, status, remarks || '', attachmentPath]
+            [tracking_number, category || 'Incoming', parsedDate, document_type, subject, sender, receiver, status, remarks || '', attachmentPath]
         );
         res.status(201).json({ message: 'Document logged successfully' });
     } catch (error) { res.status(500).json({ message: 'Error creating document log' }); }
@@ -30,6 +31,8 @@ exports.createLog = async (req, res) => {
 
 exports.updateLog = async (req, res) => {
     const { date_received, category, document_type, subject, sender, receiver, status, remarks, existingExtraFiles, extraRemarks } = req.body;
+    let parsedDate = date_received ? date_received : null;
+
     try {
         let finalExtraFiles = existingExtraFiles ? JSON.parse(existingExtraFiles) : [];
         if (req.files && req.files['extraFiles']) {
@@ -40,7 +43,7 @@ exports.updateLog = async (req, res) => {
         finalExtraFiles = finalExtraFiles.slice(0, 3);
 
         let query = `UPDATE DocumentTracking SET date_received=?, category=?, document_type=?, subject=?, sender=?, receiver=?, status=?, remarks=?, additional_attachments=?`;
-        let params = [date_received, category || 'Incoming', document_type, subject, sender, receiver, status, remarks || '', JSON.stringify(finalExtraFiles)];
+        let params = [parsedDate, category || 'Incoming', document_type, subject, sender, receiver, status, remarks || '', JSON.stringify(finalExtraFiles)];
 
         if (req.files && req.files['attachment']) { 
             query += `, attachment=?`; params.push(`/uploads/documents/${req.files['attachment'][0].filename}`); 
@@ -92,7 +95,10 @@ exports.editRequest = async (req, res) => {
         const driveFile = await drive.files.create({ resource: fileMetadata, media: media, fields: 'id, webViewLink' });
         await drive.permissions.create({ fileId: driveFile.data.id, requestBody: { role: 'writer', type: 'anyone' }});
         res.status(200).json({ link: driveFile.data.webViewLink, driveId: driveFile.data.id });
-    } catch (error) { res.status(500).json({ message: 'Failed to push to Google Drive.', error: error.message }); }
+    } catch (error) { 
+        console.error("DRIVE API ERROR:", error);
+        res.status(500).json({ message: 'Failed to push to Google Drive.', error: error.message }); 
+    }
 };
 
 exports.syncRequest = async (req, res) => {

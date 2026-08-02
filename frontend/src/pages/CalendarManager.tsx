@@ -1,7 +1,7 @@
 // src/pages/CalendarManager.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { Calendar, Plus, Trash2, Edit, X, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 // --- FIXED CUSTOM OVERLAY DROPDOWN ---
 // This version is designed to pop UPWARDS (bottom-full) to prevent clipping at the bottom of modals
@@ -66,8 +66,12 @@ export const formatDateRange = (startStr: string, endStr: string | null) => {
 };
 
 export const CalendarManager: React.FC = () => {
+  const user = JSON.parse(localStorage.getItem("portalUser") || "{}");
+  if (user.role !== "Superuser") return <UnderDevelopment />;
+
   const [dates, setDates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -131,7 +135,7 @@ export const CalendarManager: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Academic Calendar">
+    <>
       
       {/* HEADER CONTROLS */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -311,6 +315,6 @@ export const CalendarManager: React.FC = () => {
         </div>
       )}
 
-    </PortalLayout>
+    </>
   );
 };

@@ -1,6 +1,5 @@
 // src/pages/UserManagement.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { Search, Plus, Edit, Archive, RefreshCw, AlertCircle, CheckCircle2, X, Shield, Mail, User as UserIcon, ChevronDown } from 'lucide-react';
 
 interface User {
@@ -12,6 +11,8 @@ interface User {
   role_id: number;
   role: string;
   status: 'Active' | 'Archived';
+  setup_token?: string | null;
+  username: string;
 }
 
 // --- CUSTOM OVERLAY DROPDOWN (For Filters) ---
@@ -54,7 +55,7 @@ const CustomRoleSelect = ({ value, onChange }: { value: number, onChange: (val: 
   const [isOpen, setIsOpen] = useState(false);
   const roles = [
     { id: 1, label: 'Superuser' },
-    { id: 2, label: 'Coordinator' },
+    { id: 2, label: 'Admin' },
     { id: 3, label: 'Staff' }
   ];
   const selected = roles.find(r => r.id === value);
@@ -95,9 +96,24 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Tab state transformed into dropdown state
-  const [activeTab, setActiveTab] = useState<'Active' | 'Archived'>('Active');
+  const [activeTab, setActiveTab] = useState<string>('Active');
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText: string;
+    icon?: 'archive' | 'mail';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    confirmText: 'Confirm'
+  });
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -132,7 +148,7 @@ export const UserManagement: React.FC = () => {
   useEffect(() => { fetchUsers(); }, []);
 
   const displayRole = (roleName: string) => {
-    return roleName === 'Admin' ? 'Coordinator' : roleName;
+    return roleName;
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -177,28 +193,75 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const handleToggleArchive = async (id: number, currentStatus: string) => {
+  const requestToggleArchive = (id: number, currentStatus: string) => {
     const action = currentStatus === 'Active' ? 'archive' : 'restore';
     const confirmMessage = currentStatus === 'Active' 
       ? "Are you sure you want to suspend this account? They will lose access to the portal."
       : "Are you sure you want to restore this account's access?";
       
-    if (!window.confirm(confirmMessage)) return;
+    setConfirmModal({
+        isOpen: true,
+        title: currentStatus === 'Active' ? 'Suspend Account' : 'Restore Account',
+        message: confirmMessage,
+        icon: 'archive',
+        confirmText: currentStatus === 'Active' ? 'Suspend' : 'Restore',
+        onConfirm: async () => {
+            setConfirmModal(prev => ({...prev, isOpen: false}));
+            try {
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${id}/${action}`, { method: 'PUT' });
+              if (!response.ok) throw new Error(`Failed to ${action} user`);
+              showNotify(`User account successfully ${action}d.`, "success");
+              fetchUsers();
+            } catch (error: any) {
+              showNotify(error.message, "error");
+            }
+        }
+    });
+  };
 
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${id}/${action}`, { method: 'PUT' });
-      if (!response.ok) throw new Error(`Failed to ${action} user`);
-      
-      showNotify(`User account successfully ${action}d.`, "success");
-      fetchUsers();
-    } catch (error: any) {
-      showNotify(error.message, "error");
-    }
+  const requestSendResetLink = (user: User) => {
+    setConfirmModal({
+        isOpen: true,
+        title: 'Send Reset Link',
+        message: `Are you sure you want to send a password reset link to ${user.name}?`,
+        icon: 'mail',
+        confirmText: 'Send Link',
+        onConfirm: async () => {
+            setConfirmModal(prev => ({...prev, isOpen: false}));
+            try {
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: user.username })
+              });
+              
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.message || 'Failed to send reset link');
+              
+              showNotify(`Reset link sent successfully to ${user.email}.`, "success");
+            } catch (error: any) {
+              showNotify(error.message, "error");
+            }
+        }
+    });
+  };
+
+  const getDisplayStatus = (user: User) => {
+    if (user.status === 'Archived') return 'Inactive';
+    if (user.setup_token) return 'Pending';
+    return 'Active';
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'Inactive') return 'bg-red-50 text-red-700 border-red-200';
+    if (status === 'Pending') return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+    return 'bg-green-50 text-green-700 border-green-200';
   };
 
   // Filter Logic
   const filteredUsers = users.filter(user => {
-    const matchesTab = user.status === activeTab;
+    const displayStatus = getDisplayStatus(user);
+    const matchesTab = (activeTab === 'All') || (displayStatus === activeTab);
     const searchString = `${user.first_name} ${user.last_name} ${user.email} ${displayRole(user.role)}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
     return matchesTab && matchesSearch;
@@ -207,7 +270,7 @@ export const UserManagement: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Account Administration">
+    <>
       
       {/* Formal Top Right Notification */}
       {notification && (
@@ -236,10 +299,12 @@ export const UserManagement: React.FC = () => {
           <div className="w-full sm:w-48">
             <CustomSelect 
               value={activeTab} 
-              onChange={(val) => setActiveTab(val as 'Active' | 'Archived')} 
+              onChange={(val) => setActiveTab(val)} 
               options={[
+                {value: 'All', label: 'All Accounts'},
                 {value: 'Active', label: 'Active Accounts'},
-                {value: 'Archived', label: 'Archived Accounts'}
+                {value: 'Pending', label: 'Pending Setup'},
+                {value: 'Inactive', label: 'Inactive Accounts'}
               ]}
             />
           </div>
@@ -271,8 +336,8 @@ export const UserManagement: React.FC = () => {
                     <Shield className={`w-3.5 h-3.5 mr-1.5 ${user.role === 'Superuser' ? 'text-purple-600' : user.role === 'Admin' ? 'text-blue-600' : 'text-gray-400'}`} />
                     {displayRole(user.role)}
                   </div>
-                  <span className={`inline-flex px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded border ${user.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                    {user.status}
+                  <span className={`inline-flex px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded border ${getStatusColor(getDisplayStatus(user))}`}>
+                    {getDisplayStatus(user)}
                   </span>
                 </div>
 
@@ -290,7 +355,14 @@ export const UserManagement: React.FC = () => {
                 </div>
 
                 {/* Mobile Card Footer (Actions) */}
-                <div className="px-4 py-3 border-t border-gray-100 flex justify-end gap-2 bg-white">
+                <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap justify-end gap-2 bg-white">
+                  <button 
+                    onClick={() => requestSendResetLink(user)} 
+                    disabled={user.status === 'Archived'}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${user.status === 'Archived' ? 'text-gray-400 bg-gray-50 border border-gray-100 cursor-not-allowed' : 'text-[#9B1C1C] bg-white border border-[#9B1C1C] hover:bg-red-50'}`}
+                  >
+                    <Mail className="w-3.5 h-3.5" /> Reset Link
+                  </button>
                   <button 
                     onClick={() => openEditModal(user)} 
                     disabled={user.status === 'Archived'}
@@ -299,7 +371,7 @@ export const UserManagement: React.FC = () => {
                     <Edit className="w-3.5 h-3.5" /> Edit
                   </button>
                   <button 
-                    onClick={() => handleToggleArchive(user.id, user.status)} 
+                    onClick={() => requestToggleArchive(user.id, user.status)} 
                     disabled={loggedInUser.id === user.id}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${loggedInUser.id === user.id ? 'text-gray-300 bg-gray-50 border border-gray-100 cursor-not-allowed' : user.status === 'Active' ? 'text-red-700 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-200' : 'text-green-700 bg-white border border-gray-300 hover:bg-green-50 hover:border-green-200'}`}
                   >
@@ -357,14 +429,22 @@ export const UserManagement: React.FC = () => {
 
                   {/* Status Column */}
                   <td className="px-6 py-3 text-center align-middle">
-                    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded border ${user.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                      {user.status}
+                    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest rounded border ${getStatusColor(getDisplayStatus(user))}`}>
+                      {getDisplayStatus(user)}
                     </span>
                   </td>
 
                   {/* Actions Column */}
                   <td className="px-6 py-3 text-center align-middle">
                     <div className="flex items-center justify-center space-x-2">
+                      <button 
+                        onClick={() => requestSendResetLink(user)} 
+                        disabled={user.status === 'Archived'}
+                        className={`p-1.5 rounded border transition-colors ${user.status === 'Archived' ? 'text-gray-300 border-transparent cursor-not-allowed' : 'text-gray-400 border-transparent hover:text-[#9B1C1C] hover:bg-white hover:border-[#9B1C1C] hover:shadow-sm'}`} 
+                        title="Send Password Reset Link"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </button>
                       <button 
                         onClick={() => openEditModal(user)} 
                         disabled={user.status === 'Archived'}
@@ -376,7 +456,7 @@ export const UserManagement: React.FC = () => {
                       
                       {/* Prevent logged in user from archiving themselves */}
                       <button 
-                        onClick={() => handleToggleArchive(user.id, user.status)} 
+                        onClick={() => requestToggleArchive(user.id, user.status)} 
                         disabled={loggedInUser.id === user.id}
                         className={`p-1.5 rounded border transition-colors ${loggedInUser.id === user.id ? 'text-gray-200 border-transparent cursor-not-allowed' : user.status === 'Active' ? 'text-gray-400 border-transparent hover:text-red-600 hover:bg-white hover:border-gray-200 hover:shadow-sm' : 'text-gray-400 border-transparent hover:text-green-600 hover:bg-white hover:border-gray-200 hover:shadow-sm'}`}
                         title={user.status === 'Active' ? "Suspend Account" : "Restore Account"}
@@ -431,8 +511,8 @@ export const UserManagement: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Initial Password</label>
-                    <input type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} minLength={6} className={inputClass} placeholder="••••••••" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Initial Temp Password (Optional)</label>
+                    <input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} minLength={6} className={inputClass} placeholder="Leave blank to auto-generate" />
                   </div>
                 </div>
               </form>
@@ -492,7 +572,41 @@ export const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {/* --- CONFIRMATION MODAL --- */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-gray-900/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+          <div className="bg-white max-w-sm w-full rounded-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 p-6 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4 border border-red-100">
+              {confirmModal.icon === 'mail' ? (
+                <Mail className="w-6 h-6 text-[#9B1C1C]" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-[#9B1C1C]" />
+              )}
+            </div>
 
-    </PortalLayout>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              {confirmModal.message}
+            </p>
+
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-[#9B1C1C] hover:bg-[#7a1515] rounded-lg shadow-sm transition-colors"
+              >
+                {confirmModal.confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </>
   );
 };

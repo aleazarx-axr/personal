@@ -1,0 +1,8 @@
+{
+  "name": "wmsu-ipil-document-portal",
+  "version": "1.0.0",
+  "description": "Root package for managing frontend and backend servers",
+  "scripts": {
+    "dev": "start cmd /k \"cd backend && npm run dev\" & start cmd /k \"cd frontend && npm run dev\""
+  }
+}

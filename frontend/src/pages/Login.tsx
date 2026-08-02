@@ -1,13 +1,14 @@
 // src/pages/Login.tsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -20,7 +21,7 @@ export const Login: React.FC = () => {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: username, password }),
       });
 
       const data = await response.json();
@@ -65,7 +66,7 @@ export const Login: React.FC = () => {
                <img src="/wmsu-logo.png" alt="WMSU Logo" className="w-16 h-16 object-contain" />
             </div>
             <h1 className="text-xl font-bold text-gray-900">MyWMSU Ipil</h1>
-            <p className="text-sm text-gray-500 mt-1">Sign in to the Administrative Portal</p>
+            <p className="text-sm text-gray-500 mt-1">Login to the Administrative Portal</p>
           </div>
 
           {/* Error Alert */}
@@ -80,14 +81,14 @@ export const Login: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Email Address
+                Username
               </label>
               <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className={inputClass}
-                placeholder="admin@wmsu.edu.ph"
+                placeholder="e.g. juan.delacruz"
                 required 
                 disabled={loading}
               />
@@ -97,15 +98,24 @@ export const Login: React.FC = () => {
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 Password
               </label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputClass}
-                placeholder="••••••••"
-                required 
-                disabled={loading}
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass}
+                  placeholder="••••••••"
+                  required 
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button 
@@ -123,10 +133,16 @@ export const Login: React.FC = () => {
                   Verifying...
                 </>
               ) : (
-                'Sign In'
+                'Login'
               )}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Link to="/forgot-password" className="text-xs font-medium text-[#9B1C1C] hover:underline hover:text-[#7a1515] transition-colors">
+              Forgot Password?
+            </Link>
+          </div>
 
           {/* Footer info */}
           <div className="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-500 font-medium">

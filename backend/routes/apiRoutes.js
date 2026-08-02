@@ -1,6 +1,16 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const { uploadDoc, uploadMemo, uploadTemplate, uploadNews, uploadAdmin } = require('../middlewares/uploadMiddleware');
+
+// --- SECURITY MIDDLEWARES ---
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per `window` (here, per 15 minutes)
+    message: { message: "Too many login attempts from this IP, please try again after 15 minutes" },
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
 
 // Import Controllers
 const userController = require('../controllers/userController');
@@ -11,9 +21,16 @@ const schedulerController = require('../controllers/schedulerController');
 const assessmentController = require('../controllers/assessmentController');
 
 // --- USERS ---
-router.post('/auth/login', userController.loginUser);
+router.post('/auth/login', loginLimiter, userController.loginUser);
+router.post('/auth/forgot-password', loginLimiter, userController.forgotPassword);
 router.get('/users', userController.getUsers);
-// (Add the rest of your user routes here from previous step)
+router.post('/users/create', userController.createUser);
+router.post('/users/setup-password', userController.setupPassword);
+router.get('/users/validate-token', userController.validateToken);
+router.put('/users/profile/:id', userController.updateProfile);
+router.put('/users/:id', userController.updateUser);
+router.put('/users/:id/archive', userController.archiveUser);
+router.put('/users/:id/restore', userController.restoreUser);
 
 // --- DOCUMENTS ---
 router.get('/document-tracking', documentController.getLogs);
@@ -35,6 +52,8 @@ router.put('/memoranda/:id', uploadMemo.fields([{ name: 'attachment', maxCount: 
 router.put('/memoranda/:id/status', memoController.updateStatus);
 router.delete('/memoranda/:id', memoController.archiveMemo);
 router.put('/memoranda/:id/restore', memoController.restoreMemo);
+router.post('/memoranda/:id/edit-request', memoController.editRequest);
+router.post('/memoranda/:id/sync-request', memoController.syncRequest);
 
 // --- SYSTEM DATA (News, Dates, Admins, Classrooms, Loads) ---
 router.get('/logs', systemController.getLogs);
@@ -50,6 +69,9 @@ router.get('/classrooms', systemController.getClassrooms);
 router.post('/classrooms', systemController.createClassroom);
 router.get('/teaching-loads', systemController.getTeachingLoads);
 router.post('/teaching-loads', systemController.createTeachingLoad);
+router.get('/system/network-info', systemController.getNetworkInfo);
+router.get('/settings', systemController.getSettings);
+router.post('/settings', systemController.saveSettings);
 
 // --- SCHEDULER ---
 router.post('/generate-schedule', schedulerController.generateSchedule);

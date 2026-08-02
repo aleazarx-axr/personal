@@ -1,11 +1,15 @@
 // src/pages/OfficialsManager.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
-import { Users, Plus, Trash2, Edit, X, Search, Upload, Shield } from 'lucide-react';
+import { Users, Plus, Trash2, Edit, X, Search, Upload } from 'lucide-react';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 export const OfficialsManager: React.FC = () => {
+  const user = JSON.parse(localStorage.getItem("portalUser") || "{}");
+  if (user.role !== "Superuser") return <UnderDevelopment />;
+
   const [officials, setOfficials] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -92,7 +96,7 @@ export const OfficialsManager: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Manage Key Officials">
+    <>
       
       {/* HEADER CONTROLS (Matched to CalendarManager) */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -265,6 +269,6 @@ export const OfficialsManager: React.FC = () => {
         </div>
       )}
 
-    </PortalLayout>
+    </>
   );
 };

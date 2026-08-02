@@ -1,7 +1,7 @@
 // src/pages/Memoranda.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
-import { Search, FileText, Plus, Edit, Download, ArrowLeft, ExternalLink, Loader2, Save, X, Upload, Paperclip, Files, Eye, AlertCircle, CheckCircle2, ChevronDown, Settings, Trash2, Archive, RotateCcw } from 'lucide-react';
+import { Search, FileText, Plus, Edit, Download, ExternalLink, Loader2, Save, X, Upload, Paperclip, Files, Eye, AlertCircle, CheckCircle2, ChevronDown, Settings, Trash2, Archive, RotateCcw } from 'lucide-react';
+import { DragDropFileInput } from '../components/DragDropFileInput';
 
 interface ExtraFile { url: string; remark: string; }
 
@@ -11,7 +11,7 @@ interface DocumentDraft {
   status: string; remarks: string;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB Limit
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB Limit
 
 // --- CUSTOM OVERLAY DROPDOWN ---
 const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { value: string, onChange: (val: string) => void, options: {value: string, label: string}[], className?: string }) => {
@@ -48,42 +48,22 @@ const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { va
   );
 };
 
-// --- CUSTOM STATUS BADGE DROPDOWN ---
-const StatusSelect = ({ value, onChange, disabled }: { value: string, onChange: (val: string) => void, disabled: boolean }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
+// --- CUSTOM STATUS BADGE ---
+const StatusBadge = ({ value }: { value: string }) => {
   const getStyle = (val: string) => {
     if (val === 'Completed') return 'bg-green-50 text-green-700 border-green-200';
+    if (val === 'Received') return 'bg-purple-50 text-purple-700 border-purple-200';
     if (val === 'Returned') return 'bg-red-50 text-red-700 border-red-200';
+    if (val === 'Routed') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (val === 'Draft') return 'bg-gray-50 text-gray-700 border-gray-200';
     return 'bg-yellow-50 text-yellow-700 border-yellow-200';
   };
 
   return (
     <div className="relative w-[105px] shrink-0">
-      <div 
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full px-2 py-1.5 border rounded text-[10px] font-semibold uppercase tracking-wider flex justify-between items-center transition-all ${getStyle(value)} ${disabled ? 'opacity-90 cursor-not-allowed' : 'cursor-pointer hover:shadow-sm'}`}
-      >
+      <div className={`w-full px-2 py-1.5 border rounded text-[10px] font-semibold uppercase tracking-wider flex justify-center items-center ${getStyle(value)}`}>
         <span>{value}</span>
-        {!disabled && <ChevronDown className={`w-3 h-3 ml-1 opacity-70 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
       </div>
-      
-      {isOpen && !disabled && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
-          <div className="absolute z-[100] w-[115px] top-full mt-1 right-0 bg-white border border-gray-200 rounded-md shadow-xl overflow-hidden">
-            {['Pending', 'Returned', 'Completed'].map(opt => (
-              <div 
-                key={opt}
-                onClick={() => { onChange(opt); setIsOpen(false); }}
-                className={`px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider cursor-pointer transition-colors ${opt === value ? 'bg-gray-100 text-gray-900 border-l-2 border-gray-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-2 border-transparent'}`}
-              >
-                {opt}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 };
@@ -119,7 +99,7 @@ export const Memoranda: React.FC = () => {
   const [fileManagerModal, setFileManagerModal] = useState<{ isOpen: boolean; memo: DocumentDraft | null }>({ isOpen: false, memo: null });
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string } | null>(null);
   
-  const [viewingFile, setViewingFile] = useState<{ localUrl: string; name: string; memoId: number; targetUrl?: string } | null>(null);
+  const [newlyDraftedMemoId, setNewlyDraftedMemoId] = useState<number | null>(null);
   const [activeEdits, setActiveEdits] = useState<Record<string, string>>({}); 
   const [isPushing, setIsPushing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -211,16 +191,17 @@ export const Memoranda: React.FC = () => {
     if (newSubject.trim().length < 3) return showNotify("Subject must be at least 3 characters long.", "error");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memoranda/create-from-template`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/memoranda/create-from-template`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: newSubject.trim(), issuer_id: loggedInUser.id, documentType: draftType })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to draft document.');
       
-      showNotify(`${draftType} drafted successfully!`, "success");
-      setIsDraftModalOpen(false); setNewSubject(''); fetchData(viewMode === 'Archived');
-      setViewingFile({ localUrl: `${import.meta.env.VITE_API_URL}${data.attachment}`, name: data.memoNumber, memoId: data.id });
+      showNotify(`${draftType} drafted successfully! Redirecting to Google Docs...`, "success");
+      setNewSubject(''); fetchData(viewMode === 'Archived');
+      setNewlyDraftedMemoId(data.id);
+      handleEditInDocs(data.id);
     } catch (err: any) { showNotify(err.message, "error"); }
   };
 
@@ -261,16 +242,6 @@ export const Memoranda: React.FC = () => {
     } catch (error: any) { showNotify(error.message, "error"); }
   };
 
-  const handleQuickStatusChange = async (id: number, newStatus: string) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memoranda/${id}/status`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
-      });
-      if (!response.ok) throw new Error('Error updating status');
-      showNotify("Status updated successfully.", "success");
-      fetchData(viewMode === 'Archived'); 
-    } catch (error: any) { showNotify(error.message, "error"); fetchData(viewMode === 'Archived'); }
-  };
 
   const confirmArchive = async () => {
     if (!documentToArchive) return;
@@ -305,39 +276,56 @@ export const Memoranda: React.FC = () => {
     }
   };
 
-  const getEditKey = () => viewingFile ? `${viewingFile.memoId}_${viewingFile.targetUrl || 'main'}` : '';
-
-  const handleEditInDocs = async () => { 
-    if (!viewingFile) return; setIsPushing(true);
+  const handleEditInDocs = async (memoId: number, targetUrl?: string) => { 
+    setIsPushing(true);
+    const newWindow = window.open('about:blank', '_blank'); // Open synchronously to bypass popup blocker
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memoranda/${viewingFile.memoId}/edit-request`, { 
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetUrl: viewingFile.targetUrl })
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/memoranda/${memoId}/edit-request`, { 
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetUrl })
       });
-      if (!response.ok) throw new Error("Google Drive API error.");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || errData.message || "Google Drive API error.");
+      }
       const data = await response.json(); 
-      setActiveEdits(prev => ({ ...prev, [getEditKey()]: data.driveId }));
-      window.open(data.link, '_blank');
-    } catch (error: any) { showNotify(error.message, "error"); } finally { setIsPushing(false); }
+      setActiveEdits(prev => ({ ...prev, [`${memoId}_${targetUrl || 'main'}`]: data.driveId }));
+      
+      if (newWindow) {
+        newWindow.location.href = data.link;
+      }
+    } catch (error: any) { 
+      if (newWindow) newWindow.close();
+      showNotify(error.message, "error"); 
+    } finally { setIsPushing(false); }
   };
 
-  const handleSyncChanges = async () => { 
-    if (!viewingFile) return; 
-    const currentDriveId = activeEdits[getEditKey()]; 
+  const handleSyncChanges = async (memoId: number, targetUrl?: string) => { 
+    const currentDriveId = activeEdits[`${memoId}_${targetUrl || 'main'}`]; 
     if (!currentDriveId) return; setIsSyncing(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/memoranda/${viewingFile.memoId}/sync-request`, { 
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/memoranda/${memoId}/sync-request`, { 
         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ driveId: currentDriveId, targetUrl: viewingFile.targetUrl }) 
+        body: JSON.stringify({ driveId: currentDriveId, targetUrl }) 
       });
-      if (!response.ok) throw new Error("Sync failed."); 
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || errData.message || "Sync failed."); 
+      }
       showNotify("Changes synced successfully from Google Docs!", "success");
-      setActiveEdits(prev => { const updated = { ...prev }; delete updated[getEditKey()]; return updated; });
-      setViewingFile(null);
+      setActiveEdits(prev => { const updated = { ...prev }; delete updated[`${memoId}_${targetUrl || 'main'}`]; return updated; });
+      
+      // If synced from the draft modal, close it
+      if (newlyDraftedMemoId === memoId) {
+        setNewlyDraftedMemoId(null);
+        setIsDraftModalOpen(false);
+      }
+      
+      fetchData(viewMode === 'Archived');
     } catch (error: any) { showNotify(error.message, "error"); } finally { setIsSyncing(false); }
   };
 
   const validateFileSelection = (file: File | null) => {
-    if (file && file.size > MAX_FILE_SIZE) { showNotify(`"${file.name}" is too large. Maximum size is 5MB.`, "error"); return false; }
+    if (file && file.size > MAX_FILE_SIZE) { showNotify(`"${file.name}" is too large. Maximum size is 50MB.`, "error"); return false; }
     return true;
   };
 
@@ -350,7 +338,7 @@ export const Memoranda: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Issuances & Memos">
+    <>
       
       {notification && (
         <div className={`fixed top-6 right-6 z-[200] px-5 py-3 rounded-md shadow-lg flex items-center gap-3 text-white text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100 ${notification.type === 'error' ? 'bg-red-600' : 'bg-green-700'}`}>
@@ -423,13 +411,74 @@ export const Memoranda: React.FC = () => {
               )}
             </div>
             
-            <button 
-              onClick={() => setIsTemplateManagerOpen(true)}
-              className="px-3 h-[42px] bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 rounded-md shadow-sm flex items-center justify-center transition-colors"
-              title="Template Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsTemplateManagerOpen(!isTemplateManagerOpen)}
+                className="px-3 h-[42px] bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 rounded-md shadow-sm flex items-center justify-center transition-colors"
+                title="Template Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              {isTemplateManagerOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsTemplateManagerOpen(false)}></div>
+                  <div className="absolute top-full right-0 mt-2 w-[320px] bg-white border border-gray-200 rounded-md shadow-xl z-50 flex flex-col max-h-[70vh] overflow-hidden">
+                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+                      <h3 className="font-semibold text-gray-900 text-sm flex items-center"><Settings className="w-4 h-4 mr-1.5 text-gray-500"/> Template Settings</h3>
+                    </div>
+                    
+                    <div className="p-4 space-y-4 overflow-y-auto">
+                      <div>
+                        <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Active Base Templates</h4>
+                        {templates.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {templates.map(tpl => (
+                              <div key={tpl} className="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md">
+                                <span className="text-xs font-medium text-gray-800">{tpl} Document</span>
+                                <button onClick={() => handleDeleteTemplate(tpl)} className="text-gray-400 hover:text-red-600 transition-colors" title="Delete Template"><Trash2 className="w-3.5 h-3.5"/></button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500 italic p-3 bg-gray-50 border border-gray-200 rounded-md text-center">No templates assigned.</div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t border-gray-200">
+                        <h4 className="text-[10px] font-semibold text-gray-800 mb-2 uppercase tracking-wider">Assign New Template</h4>
+                        <form onSubmit={handleUploadTemplate} className="space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Category</label>
+                            <CustomSelect 
+                              value={newTemplateName} 
+                              onChange={(val) => setNewTemplateName(val)} 
+                              options={[
+                                {value: 'Memo', label: 'Memo'},
+                                {value: 'Letter', label: 'Letter'},
+                                {value: 'Endorsement', label: 'Endorsement'},
+                                {value: 'Proposal', label: 'Proposal'},
+                                {value: 'Report', label: 'Report'}
+                              ]}
+                              className="h-[36px]"
+                            />
+                          </div>
+                          <div>
+                            <DragDropFileInput 
+                              label="Upload Template (.docx)" 
+                              currentFile={newTemplateFile} 
+                              accept=".docx"
+                              onFileSelect={(file) => setNewTemplateFile(file)} 
+                            />
+                          </div>
+                          <button type="submit" className="w-full h-[36px] bg-[#9B1C1C] hover:bg-[#7a1515] text-white text-xs font-medium rounded-md transition-colors shadow-sm">Upload Template</button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -446,7 +495,6 @@ export const Memoranda: React.FC = () => {
             filteredDocs.map((doc) => {
               const safeAttachments = parseAttachments(doc.additional_attachments);
               const totalFiles = (doc.attachment ? 1 : 0) + safeAttachments.length;
-              const isCompleted = doc.status === 'Completed';
 
               return (
                 <div key={doc.id} className="bg-white border border-gray-200 rounded-md shadow-sm flex flex-col overflow-visible">
@@ -457,11 +505,7 @@ export const Memoranda: React.FC = () => {
                       <span className="text-xs text-gray-500 truncate">{new Date(doc.date).toLocaleDateString()}</span>
                     </div>
                     
-                    <StatusSelect 
-                      value={doc.status || 'Pending'}
-                      onChange={(val) => handleQuickStatusChange(doc.id, val)}
-                      disabled={isCompleted || viewMode === 'Archived'}
-                    />
+                    <StatusBadge value={doc.status === 'Pending' || !doc.status ? 'Draft' : doc.status} />
                   </div>
 
                   <div className="p-4">
@@ -525,7 +569,6 @@ export const Memoranda: React.FC = () => {
              filteredDocs.map((doc) => {
                const safeAttachments = parseAttachments(doc.additional_attachments);
                const totalFiles = (doc.attachment ? 1 : 0) + safeAttachments.length;
-               const isCompleted = doc.status === 'Completed';
                
                return (
                 <tr key={doc.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -554,11 +597,7 @@ export const Memoranda: React.FC = () => {
 
                   <td className="px-4 py-3 text-center align-top pt-3.5">
                     <div className="flex justify-center">
-                      <StatusSelect 
-                        value={doc.status || 'Pending'}
-                        onChange={(val) => handleQuickStatusChange(doc.id, val)}
-                        disabled={isCompleted || viewMode === 'Archived'}
-                      />
+                      <StatusBadge value={doc.status === 'Pending' || !doc.status ? 'Draft' : doc.status} />
                     </div>
                   </td>
 
@@ -592,60 +631,6 @@ export const Memoranda: React.FC = () => {
         </table>
       </div>
 
-      {/* --- DESIGNATED TEMPLATE MANAGER MODAL --- */}
-      {isTemplateManagerOpen && (
-        <div className="fixed inset-0 bg-gray-900/60 z-[80] flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full border border-gray-200 rounded-lg shadow-xl flex flex-col overflow-hidden max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-50 shrink-0">
-              <h3 className="font-semibold text-gray-900 text-base flex items-center"><Settings className="w-5 h-5 mr-2 text-gray-500"/> Template Settings</h3>
-              <button onClick={() => setIsTemplateManagerOpen(false)} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
-            </div>
-            
-            <div className="p-6 space-y-6 overflow-y-auto pb-48">
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Active Base Templates</h4>
-                {templates.length > 0 ? (
-                  <div className="space-y-2">
-                    {templates.map(tpl => (
-                      <div key={tpl} className="flex justify-between items-center p-3 bg-white border border-gray-200 rounded-md">
-                        <span className="text-sm font-medium text-gray-800">{tpl} Document</span>
-                        <button onClick={() => handleDeleteTemplate(tpl)} className="text-gray-400 hover:text-red-600 transition-colors" title="Delete Template"><Trash2 className="w-4 h-4"/></button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500 italic p-4 bg-gray-50 border border-gray-200 rounded-md text-center">No templates assigned yet.</div>
-                )}
-              </div>
-
-              <div className="pt-6 border-t border-gray-200">
-                <h4 className="text-xs font-semibold text-gray-800 mb-3">Assign New Template</h4>
-                <form onSubmit={handleUploadTemplate} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Document Category</label>
-                    <CustomSelect 
-                      value={newTemplateName} 
-                      onChange={(val) => setNewTemplateName(val)} 
-                      options={[
-                        {value: 'Memo', label: 'Memo'},
-                        {value: 'Letter', label: 'Letter'},
-                        {value: 'Endorsement', label: 'Endorsement'},
-                        {value: 'Proposal', label: 'Proposal'},
-                        {value: 'Report', label: 'Report'}
-                      ]}
-                    />
-                  </div>
-                  <div className="border border-dashed border-gray-300 p-4 rounded-md bg-gray-50">
-                    <label className="block text-xs font-medium text-gray-600 mb-2 flex items-center"><Upload className="w-4 h-4 mr-1.5 text-gray-400"/> Select .docx Template File</label>
-                    <input type="file" required accept=".docx" onChange={(e) => setNewTemplateFile(e.target.files ? e.target.files[0] : null)} className="w-full text-sm text-gray-600 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300 cursor-pointer" />
-                  </div>
-                  <button type="submit" className="w-full h-[42px] bg-[#9B1C1C] hover:bg-[#7a1515] text-white text-sm font-medium rounded-md transition-colors shadow-sm">Upload Template</button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* --- UNIFIED FILE MANAGER MODAL --- */}
       {fileManagerModal.isOpen && fileManagerModal.memo && (
@@ -668,12 +653,15 @@ export const Memoranda: React.FC = () => {
                       <div className="flex items-center text-sm font-medium text-gray-900 truncate"><FileText className="w-4 h-4 mr-2 text-[#9B1C1C] shrink-0" /> <span className="truncate">{fileManagerModal.memo.memoNumber} Final Draft</span></div>
                     </div>
                     <div className="flex gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
-                       <button onClick={() => {
-                          setViewingFile({ localUrl: `${import.meta.env.VITE_API_URL}${fileManagerModal.memo!.attachment}`, name: fileManagerModal.memo!.memoNumber, memoId: fileManagerModal.memo!.id });
-                          setFileManagerModal({ isOpen: false, memo: null });
-                       }} className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
-                         <Edit className="w-3.5 h-3.5 mr-1.5 text-gray-500"/> Edit via Docs
-                       </button>
+                       {activeEdits[`${fileManagerModal.memo.id}_main`] ? (
+                         <button onClick={() => handleSyncChanges(fileManagerModal.memo!.id)} disabled={isSyncing} className="flex-1 sm:flex-none px-3 py-1.5 bg-green-50 border border-green-300 hover:bg-green-100 text-green-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
+                           {isSyncing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Save Changes
+                         </button>
+                       ) : (
+                         <button onClick={() => handleEditInDocs(fileManagerModal.memo!.id)} disabled={isPushing} className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
+                           {isPushing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5 mr-1.5 text-blue-600" />} Open in Docs
+                         </button>
+                       )}
                        {isViewable(fileManagerModal.memo.attachment) && (
                          <button onClick={() => setPreviewFile({ url: fileManagerModal.memo!.attachment!, name: `${fileManagerModal.memo!.memoNumber} File` })} className="flex-1 sm:flex-none px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center border border-gray-300 transition-colors"><Eye className="w-4 h-4 mr-1.5 text-gray-500"/> Preview</button>
                        )}
@@ -700,12 +688,15 @@ export const Memoranda: React.FC = () => {
                           
                           <div className="flex gap-2 shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
                             {isDocx && file?.url && (
-                              <button onClick={() => {
-                                setViewingFile({ localUrl: `${import.meta.env.VITE_API_URL}${file.url}`, name: fileName || 'File', memoId: fileManagerModal.memo!.id, targetUrl: file.url });
-                                setFileManagerModal({ isOpen: false, memo: null });
-                              }} className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
-                                <Edit className="w-3.5 h-3.5 mr-1.5 text-gray-500"/> Edit
-                              </button>
+                              activeEdits[`${fileManagerModal.memo!.id}_${file.url}`] ? (
+                                <button onClick={() => handleSyncChanges(fileManagerModal.memo!.id, file.url)} disabled={isSyncing} className="flex-1 sm:flex-none px-3 py-1.5 bg-green-50 border border-green-300 hover:bg-green-100 text-green-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
+                                  {isSyncing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />} Save Changes
+                                </button>
+                              ) : (
+                                <button onClick={() => handleEditInDocs(fileManagerModal.memo!.id, file.url)} disabled={isPushing} className="flex-1 sm:flex-none px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center transition-colors">
+                                  {isPushing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5 mr-1.5 text-blue-600" />} Open in Docs
+                                </button>
+                              )
                             )}
                             {isViewable(file.url) && (
                               <button onClick={() => setPreviewFile({ url: file.url, name: fileName || 'File' })} className="flex-1 sm:flex-none px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded shadow-sm flex items-center justify-center border border-gray-300 transition-colors"><Eye className="w-4 h-4 mr-1.5 text-gray-500"/> Preview</button>
@@ -769,7 +760,7 @@ export const Memoranda: React.FC = () => {
                     <textarea value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} rows={2} className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] resize-none"></textarea>
                   </div>
                   <div className="border border-dashed border-gray-300 p-4 rounded-md bg-gray-50">
-                    <label className="block text-xs font-medium text-gray-600 mb-2 flex items-center"><Upload className="w-4 h-4 mr-1.5 text-gray-400"/> Replace Primary Document (Optional)</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-2 flex items-center"><Upload className="w-4 h-4 mr-1.5 text-gray-400" /> Primary Document File (Optional, Max 50MB)</label>
                     <input type="file" onChange={(e) => {
                         const file = e.target.files ? e.target.files[0] : null;
                         if (validateFileSelection(file)) setEditData({...editData, file});
@@ -780,7 +771,7 @@ export const Memoranda: React.FC = () => {
 
                 <div className="pt-6 border-t border-gray-100">
                   <div className="flex justify-between items-center mb-3">
-                    <label className="block text-xs font-medium text-gray-800 flex items-center"><Paperclip className="w-4 h-4 mr-1.5 text-gray-400"/> Supporting Attachments</label>
+                    <label className="block text-xs font-medium text-gray-800 flex items-center"><Paperclip className="w-4 h-4 mr-1.5 text-gray-400" /> Supporting Attachments (Max 50MB/file)</label>
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{editData.existingExtraFiles.length + editData.newExtraSlots.length} / 3</span>
                   </div>
 
@@ -838,17 +829,36 @@ export const Memoranda: React.FC = () => {
         <div className="fixed inset-0 bg-gray-900/60 z-[70] flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full border border-gray-200 rounded-lg shadow-xl flex flex-col overflow-hidden">
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="font-semibold text-gray-900 text-base">Initialize New {draftType}</h3>
-              <button onClick={() => setIsDraftModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
+              <h3 className="font-semibold text-gray-900 text-base truncate max-w-[320px]">{newlyDraftedMemoId ? (newSubject || draftType) : `Initialize New ${draftType}`}</h3>
+              <button onClick={() => { setIsDraftModalOpen(false); setNewlyDraftedMemoId(null); }} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleDraftDocument} className="p-6 bg-white">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Document Subject or Title</label>
-              <input type="text" required value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className={inputClass} placeholder="e.g. Schedule of Intramurals" />
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsDraftModalOpen(false)} className="px-5 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">Cancel</button>
-                <button type="submit" className="bg-[#9B1C1C] hover:bg-[#7a1515] text-white px-6 py-2 text-sm font-medium rounded-md shadow-sm transition-colors">Generate Draft</button>
+            
+            {newlyDraftedMemoId ? (
+              <div className="p-8 bg-white text-center">
+                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">{draftType} Drafted!</h4>
+                <p className="text-sm text-gray-600 mb-6">
+                  Your document is now open in Google Docs. Make your changes there, then click below to save them to the portal.
+                </p>
+                <button 
+                  onClick={() => handleSyncChanges(newlyDraftedMemoId)} 
+                  disabled={isSyncing}
+                  className="w-full bg-[#9B1C1C] hover:bg-[#7a1515] text-white px-6 py-3 text-sm font-medium rounded-md shadow-sm flex justify-center items-center transition-colors"
+                >
+                  {isSyncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} 
+                  Save changes
+                </button>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleDraftDocument} className="p-6 bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Document Subject or Title</label>
+                <input type="text" required value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className={inputClass} placeholder="e.g. Schedule of Intramurals" />
+                <div className="flex justify-end gap-3 mt-6">
+                  <button type="button" onClick={() => setIsDraftModalOpen(false)} className="px-5 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">Cancel</button>
+                  <button type="submit" className="bg-[#9B1C1C] hover:bg-[#7a1515] text-white px-6 py-2 text-sm font-medium rounded-md shadow-sm transition-colors">Generate Draft</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -881,33 +891,8 @@ export const Memoranda: React.FC = () => {
         </div>
       )}
 
-      {/* --- GOOGLE DOCS VIEWER (For Editor Bridge) --- */}
-      {viewingFile && (
-        <div className="fixed inset-0 bg-gray-900/95 z-[100] flex flex-col">
-          <div className="flex justify-between items-center px-6 py-4 text-white border-b border-gray-700 bg-black/40">
-            <div className="flex items-center gap-4">
-              <button onClick={() => setViewingFile(null)} className="p-2 hover:bg-white/10 rounded transition-colors group"><ArrowLeft className="w-5 h-5 text-gray-300 group-hover:text-white" /></button>
-              <div className="flex items-center gap-3"><div className="p-1.5 bg-white/10 rounded"><FileText className="w-5 h-5 text-white" /></div><div className="font-semibold text-sm tracking-wide text-white">{viewingFile.name}</div></div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden flex justify-center items-center p-4 sm:p-8">
-            <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl shadow-2xl p-8 sm:p-12 text-center flex flex-col items-center">
-              <div className="bg-gray-50 p-4 rounded-full border border-gray-100 mb-6"><FileText className="w-10 h-10 text-[#9B1C1C]" /></div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Live Document Bridge</h3>
-              <p className="text-gray-600 text-sm mb-8 leading-relaxed max-w-md border-b border-gray-100 pb-8">You can download the raw document file directly to your computer, or open it seamlessly in Google Docs for live editing.</p>
-              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
-                <a href={viewingFile.localUrl} download target="_blank" rel="noreferrer" className="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-md px-4 py-3 text-sm font-medium flex items-center justify-center transition-colors"><Download className="w-4 h-4 mr-2 text-gray-500" /> Download File</a>
-                {activeEdits[getEditKey()] ? (
-                  <button onClick={handleSyncChanges} disabled={isSyncing} className="flex-1 bg-green-700 hover:bg-green-800 text-white rounded-md px-4 py-3 text-sm font-medium flex items-center justify-center transition-colors shadow-sm">{isSyncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Pull Changes</button>
-                ) : (
-                  <button onClick={handleEditInDocs} disabled={isPushing} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-3 text-sm font-medium flex items-center justify-center transition-colors shadow-sm">{isPushing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ExternalLink className="w-4 h-4 mr-2" />} Open in Docs</button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-    </PortalLayout>
+
+    </>
   );
 };

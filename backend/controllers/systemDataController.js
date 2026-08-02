@@ -1,11 +1,57 @@
 const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+// --- NETWORK INFO ---
+exports.getNetworkInfo = (req, res) => {
+    const interfaces = os.networkInterfaces();
+    let ipAddress = 'localhost';
+    
+    for (const devName in interfaces) {
+        const iface = interfaces[devName];
+        for (let i = 0; i < iface.length; i++) {
+            const alias = iface[i];
+            if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+                ipAddress = alias.address;
+                break;
+            }
+        }
+    }
+    res.status(200).json({ ip: ipAddress, port: process.env.PORT || 5000 });
+};
+
+// --- SYSTEM SETTINGS ---
+exports.getSettings = async (req, res) => {
+    try {
+        const [rows] = await db.execute('SELECT setting_key, setting_value FROM SystemSettings');
+        const settings = {};
+        rows.forEach(row => { settings[row.setting_key] = row.setting_value; });
+        res.status(200).json(settings);
+    } catch (error) { 
+        res.status(500).json({ message: 'Error fetching settings' }); 
+    }
+};
+
+exports.saveSettings = async (req, res) => {
+    try {
+        const settings = req.body;
+        for (const [key, value] of Object.entries(settings)) {
+            await db.execute(
+                'INSERT INTO SystemSettings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
+                [key, value, value]
+            );
+        }
+        res.status(200).json({ message: 'Settings saved successfully' });
+    } catch (error) { 
+        res.status(500).json({ message: 'Error saving settings' }); 
+    }
+};
 
 // --- ACTIVITY LOGS ---
 exports.getLogs = async (req, res) => {
     try {
-        const [logs] = await db.execute(`SELECT l.id, l.action, l.details, l.created_at, CONCAT(u.first_name, ' ', u.last_name) AS user_name, r.role_name AS role FROM ActivityLogs l JOIN Users u ON l.user_id = u.id JOIN Roles r ON l.role_id = r.id ORDER BY l.created_at DESC LIMIT 100`);
+        const [logs] = await db.execute(`SELECT l.id, l.action, l.details, l.created_at, CONCAT(u.first_name, ' ', u.last_name) AS user_name, r.role_name AS role FROM ActivityLogs l LEFT JOIN Users u ON l.user_id = u.id LEFT JOIN Roles r ON l.role_id = r.id ORDER BY l.created_at DESC LIMIT 1000`);
         res.status(200).json(logs);
     } catch (error) { res.status(500).json({ message: 'Error fetching logs' }); }
 };

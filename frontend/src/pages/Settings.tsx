@@ -1,6 +1,5 @@
 // src/pages/Settings.tsx
-import React, { useState } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
+import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Database, Shield, Globe, AlertCircle, CheckCircle2, X, Download, ChevronDown, Loader2 } from 'lucide-react';
 
 // --- CUSTOM OVERLAY DROPDOWN ---
@@ -42,13 +41,16 @@ export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'General' | 'Security' | 'Backup'>('General');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [generalSettings, setGeneralSettings] = useState({
     systemName: 'MyWMSU Ipil Document Portal',
     contactEmail: 'admin@wmsu.edu.ph',
-    academicYear: '2025-2026',
+    academicYearStart: '2026-08-03',
+    academicYearEnd: '2027-05-14',
     defaultPagination: '25'
   });
+  const [initialGeneralSettings, setInitialGeneralSettings] = useState(generalSettings);
 
   const [securitySettings, setSecuritySettings] = useState({
     maintenanceMode: false,
@@ -61,13 +63,84 @@ export const Settings: React.FC = () => {
     setTimeout(() => setNotification(null), 4000);
   };
 
+
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        const loadedGeneral = {
+          ...generalSettings,
+          systemName: data.system_name || generalSettings.systemName,
+          contactEmail: data.contact_email || generalSettings.contactEmail,
+          academicYearStart: data.academic_year_start || generalSettings.academicYearStart,
+          academicYearEnd: data.academic_year_end || generalSettings.academicYearEnd,
+          defaultPagination: data.default_pagination || generalSettings.defaultPagination
+        };
+        setGeneralSettings(loadedGeneral);
+        setInitialGeneralSettings(loadedGeneral);
+        setSecuritySettings(prev => ({
+          ...prev,
+          maintenanceMode: data.maintenance_mode === 'true',
+          enforceStrongPasswords: data.enforce_strong_passwords !== 'false',
+          sessionTimeout: data.session_timeout || prev.sessionTimeout
+        }));
+      })
+      .catch(err => {
+        console.error("Failed to load settings:", err);
+      });
+  }, []);
+
+  const executeSaveSettings = async () => {
+    setIsSaving(true);
+    setShowConfirmModal(false);
+    
+    const payload = {
+      system_name: generalSettings.systemName,
+      contact_email: generalSettings.contactEmail,
+      academic_year_start: generalSettings.academicYearStart,
+      academic_year_end: generalSettings.academicYearEnd,
+      default_pagination: generalSettings.defaultPagination,
+      maintenance_mode: securitySettings.maintenanceMode.toString(),
+      enforce_strong_passwords: securitySettings.enforceStrongPasswords.toString(),
+      session_timeout: securitySettings.sessionTimeout
+    };
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        setInitialGeneralSettings(generalSettings);
+        showNotify("System configurations saved securely.", "success");
+      } else {
+        showNotify("Failed to save settings.", "error");
+      }
+    } catch (error) {
+      showNotify("Network error while saving settings.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      showNotify("System configurations saved securely.", "success");
-    }, 800);
+
+    const isAcademicYearChanged = 
+      generalSettings.academicYearStart !== initialGeneralSettings.academicYearStart ||
+      generalSettings.academicYearEnd !== initialGeneralSettings.academicYearEnd;
+
+    const today = new Date();
+    const endDate = new Date(initialGeneralSettings.academicYearEnd);
+
+    if (isAcademicYearChanged && today < endDate) {
+      setShowConfirmModal(true);
+      return;
+    }
+
+    executeSaveSettings();
   };
 
   const handleBackup = () => {
@@ -77,13 +150,43 @@ export const Settings: React.FC = () => {
   const inputClass = "w-full h-[42px] max-w-lg px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="System Settings">
+    <>
       
       {notification && (
         <div className={`fixed top-6 right-6 z-[200] px-5 py-3 rounded-md shadow-lg flex items-center gap-3 text-white text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100 ${notification.type === 'error' ? 'bg-red-600' : 'bg-green-700'}`}>
           {notification.type === 'error' ? <AlertCircle className="w-5 h-5"/> : <CheckCircle2 className="w-5 h-5"/>}
           <span>{notification.message}</span>
           <button onClick={() => setNotification(null)} className="ml-4 opacity-80 hover:opacity-100 transition-opacity"><X className="w-4 h-4"/></button>
+        </div>
+      )}
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden border border-gray-100">
+            <div className="p-6 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sequence Reset Warning</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                The current Academic Year is still active. Changing dates now will reset your Memo sequences. Proceed?
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeSaveSettings}
+                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  Yes, proceed
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -133,10 +236,14 @@ export const Settings: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-lg">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Current Academic Year</label>
-                    <input type="text" value={generalSettings.academicYear} onChange={(e) => setGeneralSettings({...generalSettings, academicYear: e.target.value})} className={inputClass} />
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Academic Year Start</label>
+                    <input type="date" value={generalSettings.academicYearStart} onChange={(e) => setGeneralSettings({...generalSettings, academicYearStart: e.target.value})} className={inputClass} />
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Academic Year End</label>
+                    <input type="date" value={generalSettings.academicYearEnd} onChange={(e) => setGeneralSettings({...generalSettings, academicYearEnd: e.target.value})} className={inputClass} />
+                  </div>
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Default Table Rows</label>
                     <CustomSelect 
                       value={generalSettings.defaultPagination} 
@@ -220,6 +327,6 @@ export const Settings: React.FC = () => {
         </div>
 
       </div>
-    </PortalLayout>
+    </>
   );
 };

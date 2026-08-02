@@ -1,7 +1,7 @@
 // src/pages/ClassroomMonitoring.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { Monitor, Plus, Trash2, Edit, X, Search, ChevronDown, ChevronUp, MapPin, Users } from 'lucide-react';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 // Reusing the CustomSelect for consistent dropdowns
 const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { value: string, onChange: (val: string) => void, options: {value: string, label: string}[], className?: string }) => {
@@ -31,8 +31,12 @@ const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { va
 };
 
 export const ClassroomMonitoring: React.FC = () => {
+  const user = JSON.parse(localStorage.getItem("portalUser") || "{}");
+  if (user.role !== "Superuser") return <UnderDevelopment />;
+
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -98,7 +102,7 @@ export const ClassroomMonitoring: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Classroom Monitoring">
+    <>
       
       {/* HEADER CONTROLS */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -270,6 +274,6 @@ export const ClassroomMonitoring: React.FC = () => {
         </div>
       )}
 
-    </PortalLayout>
+    </>
   );
 };

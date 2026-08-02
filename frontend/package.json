@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy:local": "npm run build && node -e \"const fs = require('fs'); let html = fs.readFileSync('../backend/public/index.html', 'utf8'); html = html.replace(/crossorigin/g, ''); fs.writeFileSync('../backend/public/index.html', html);\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },

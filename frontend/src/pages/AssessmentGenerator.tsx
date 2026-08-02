@@ -1,8 +1,8 @@
 // src/pages/AssessmentGenerator.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
-import { Printer, Loader2, Save, Search, CheckCircle2, AlertCircle, X, Calculator, FileText, ChevronDown, Settings, Upload, Users, Building2, GraduationCap, CreditCard, Tag, Trash2, Plus } from 'lucide-react';
+import { Printer, Loader2, Save, Search, CheckCircle2, AlertCircle, X, Calculator, FileText, ChevronDown, Settings, Upload, Building2, GraduationCap, CreditCard, Tag, Trash2, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { value: string, onChange: (val: string) => void, options: {value: string, label: string}[], className?: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,6 +30,8 @@ const CustomSelect = ({ value, onChange, options, className = "h-[42px]" }: { va
 export const AssessmentGenerator: React.FC = () => {
   const userString = localStorage.getItem('portalUser');
   const loggedInUser = userString ? JSON.parse(userString) : { id: null, role: 'Student' };
+
+  if (loggedInUser.role !== "Superuser") return <UnderDevelopment />;
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({ programs: [], statuses: [], fees: [], students: [], settings: {} });
@@ -164,7 +166,7 @@ export const AssessmentGenerator: React.FC = () => {
     } catch(err: any) { showNotify(err.message, "error"); return false; }
   };
 
-  if (loading) return <PortalLayout pageTitle="Assessment Generator"><div className="p-8 text-center text-gray-500 text-sm">Loading matrices...</div></PortalLayout>;
+  if (loading) return <><div className="p-8 text-center text-gray-500 text-sm">Loading matrices...</div></>;
 
   if (isPrinting) {
     const [progName, major, college] = formData.program_id.split('|');
@@ -211,7 +213,7 @@ export const AssessmentGenerator: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] shadow-sm";
 
   return (
-    <PortalLayout pageTitle="Assessment of Fees">
+    <>
       {notification && (
         <div className={`fixed top-6 right-6 z-[200] px-5 py-3 rounded-md shadow-lg flex items-center gap-3 text-white text-sm font-medium transition-all duration-300 ${notification.type === 'error' ? 'bg-red-600' : 'bg-green-700'}`}>
           {notification.type === 'error' ? <AlertCircle className="w-5 h-5"/> : <CheckCircle2 className="w-5 h-5"/>}
@@ -417,6 +419,6 @@ export const AssessmentGenerator: React.FC = () => {
           </div>
         </div>
       </div>
-    </PortalLayout>
+    </>
   );
 };

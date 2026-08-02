@@ -1,6 +1,6 @@
 // src/components/PortalLayout.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link, Outlet } from "react-router-dom";
 import {
   LogOut,
   LayoutDashboard,
@@ -10,21 +10,12 @@ import {
   Folder,
   Shield,
   ChevronDown,
-  Zap,
   Globe,
   GraduationCap,
-  Calculator
+  User
 } from "lucide-react";
 
-interface PortalLayoutProps {
-  children: React.ReactNode;
-  pageTitle: string;
-}
-
-export const PortalLayout: React.FC<PortalLayoutProps> = ({
-  children,
-  pageTitle,
-}) => {
+export const PortalLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -33,11 +24,38 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
   const [pendingDocsCount, setPendingDocsCount] = useState(0);
   const [pendingMemosCount, setPendingMemosCount] = useState(0);
 
+  const location = useLocation();
+
+  const getInitialMenu = () => {
+    const path = location.pathname;
+    if (["/memoranda", "/document-tracking"].includes(path)) return "docs";
+    if (["/news-manager", "/calendar-manager", "/officials-manager"].includes(path)) return "portal";
+    if (["/classroom-monitoring", "/teaching-loads", "/master-scheduler"].includes(path)) return "academic";
+    if (["/admin", "/logs", "/settings"].includes(path)) return "admin";
+    return "";
+  };
+
+  const getPageTitle = (path: string) => {
+    if (path === '/dashboard') return 'Overview';
+    if (path === '/memoranda') return 'Issuances & Memos';
+    if (path === '/document-tracking') return 'Document Logs';
+    if (path === '/admin') return 'Account Administration';
+    if (path === '/logs') return 'System Audit Trail';
+    if (path === '/settings') return 'System Settings';
+    if (path === '/news-manager') return 'News & Announcements';
+    if (path === '/calendar-manager') return 'Academic Calendar';
+    if (path === '/officials-manager') return 'Manage Key Officials';
+    if (path === '/classroom-monitoring') return 'Classroom Monitoring';
+    if (path === '/teaching-loads') return 'Teaching Loads';
+    if (path === '/master-scheduler') return 'Academic Scheduling Engine';
+    if (path === '/assessment') return 'Assessment of Fees';
+    return 'Portal';
+  };
+
   // Accordion State
-  const [activeMenu, setActiveMenu] = useState<string>("");
+  const [activeMenu, setActiveMenu] = useState<string>(getInitialMenu());
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   const userString = localStorage.getItem("portalUser");
   const user = userString
@@ -55,32 +73,6 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
     if (isDesktopCollapsed) setIsDesktopCollapsed(false);
     setActiveMenu(activeMenu === menu ? "" : menu);
   };
-
-  // --- SMART ACCORDION ROUTING (UPDATED CATEGORIES) ---
-  useEffect(() => {
-    const path = location.pathname;
-    if (["/memoranda", "/document-tracking"].includes(path)) {
-      setActiveMenu("docs");
-    } else if (
-      ["/news-manager", "/calendar-manager", "/officials-manager"].includes(
-        path
-      )
-    ) {
-      setActiveMenu("portal");
-    } else if (
-      [
-        "/classroom-monitoring",
-        "/teaching-loads",
-        "/master-scheduler",
-      ].includes(path)
-    ) {
-      setActiveMenu("academic");
-    } else if (["/admin", "/logs", "/settings"].includes(path)) {
-      setActiveMenu("admin");
-    } else {
-      setActiveMenu("");
-    }
-  }, [location.pathname]);
 
   // --- REAL-TIME NOTIFICATION POLLING ---
   useEffect(() => {
@@ -184,6 +176,22 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
             />
             {!isDesktopCollapsed && <span>System Dashboard</span>}
           </Link>
+          <Link
+            to="/profile"
+            onClick={closeMenu}
+            className={`flex items-center px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors ${
+              isActive("/profile")
+                ? "bg-red-50 text-[#9B1C1C]"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <User
+              className={`w-4 h-4 shrink-0 ${
+                isDesktopCollapsed ? "mx-auto" : "mr-3"
+              } ${isActive("/profile") ? "text-[#9B1C1C]" : "opacity-70"}`}
+            />
+            {!isDesktopCollapsed && <span>My Profile</span>}
+          </Link>
 
           <div className="my-2 border-t border-gray-100 mx-2"></div>
 
@@ -265,8 +273,9 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
             </div>
           </div>
 
-          {/* ================= CATEGORY 2: PORTAL MANAGEMENT ================= */}
-          <div className="mt-1">
+          {/* ================= CATEGORY 2: PORTAL MANAGEMENT (Hidden for Staff) ================= */}
+          {user.role !== "Staff" && (
+            <div className="mt-1">
             <button
               onClick={() => toggleAccordion("portal")}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors ${
@@ -340,9 +349,11 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ================= CATEGORY 3: ACADEMIC OPERATIONS ================= */}
-          <div className="mt-1">
+          {/* ================= CATEGORY 3: ACADEMIC OPERATIONS (Hidden for Staff) ================= */}
+          {user.role !== "Staff" && (
+            <div className="mt-1">
             <button
               onClick={() => toggleAccordion("academic")}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors ${
@@ -429,6 +440,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           <div className="my-2 border-t border-gray-100 mx-2"></div>
 
@@ -534,9 +546,9 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
             </div>
             <button
               onClick={() => setIsLogoutModalOpen(true)}
-              className="w-full flex items-center justify-center py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-600 text-xs font-bold hover:bg-red-50 hover:text-[#9B1C1C] hover:border-red-100 transition-colors shadow-sm"
+              className="w-full flex items-center justify-center py-2 mt-2 bg-gray-50 border border-gray-200 rounded-md text-gray-600 text-xs font-bold hover:bg-red-50 hover:text-[#9B1C1C] hover:border-red-100 transition-colors shadow-sm"
             >
-              <LogOut className="w-3.5 h-3.5 mr-2" /> Sign Out
+              <LogOut className="w-3.5 h-3.5 mr-2" /> Logout
             </button>
           </div>
 
@@ -548,6 +560,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
             <button
               onClick={() => setIsLogoutModalOpen(true)}
               className="w-full flex justify-center text-gray-400 hover:text-[#9B1C1C] transition-colors"
+              title="Logout"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -567,7 +580,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
               <Menu className="w-5 h-5" />
             </button>
             <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest text-gray-800 truncate">
-              {pageTitle}
+              {getPageTitle(location.pathname)}
             </h2>
           </div>
 
@@ -594,7 +607,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
 
         {/* Dynamic Page Content */}
         <div className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="max-w-[1600px] mx-auto">{children}</div>
+          <div className="max-w-[1600px] mx-auto"><Outlet /></div>
         </div>
       </main>
 
@@ -606,7 +619,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
               <LogOut className="w-6 h-6 text-[#9B1C1C]" />
             </div>
 
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Sign Out</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Logout</h3>
             <p className="text-sm text-gray-500 mb-6">
               Are you sure you want to log out of your account?
             </p>
@@ -622,7 +635,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
                 onClick={executeLogout}
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-[#9B1C1C] hover:bg-[#7a1515] rounded-lg shadow-sm transition-colors"
               >
-                Sign Out
+                Logout
               </button>
             </div>
           </div>

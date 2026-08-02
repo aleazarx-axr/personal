@@ -1,13 +1,16 @@
 // src/pages/MasterScheduler.tsx
 import React, { useState } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { 
   Zap, Calendar, Database, Settings, Download, Upload, 
-  Search, Plus, Filter, Users, BookOpen, MapPin, Layers,
-  Play, X, Edit, Trash2
+  Search, Plus, Users, BookOpen, MapPin, Layers,
+  Play, X, Trash2
 } from 'lucide-react';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 export const MasterScheduler: React.FC = () => {
+  const user = JSON.parse(localStorage.getItem("portalUser") || "{}");
+  if (user.role !== "Superuser") return <UnderDevelopment />;
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<'timetable' | 'registries'>('timetable');
   const [activeRegistry, setActiveRegistry] = useState<'subjects' | 'faculty' | 'sections' | 'rooms'>('subjects');
@@ -91,7 +94,7 @@ export const MasterScheduler: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="Academic Scheduling Engine">
+    <>
       
       {/* FULL-SCREEN LOADING OVERLAY */}
       {loading && (
@@ -490,7 +493,7 @@ export const MasterScheduler: React.FC = () => {
         </div>
       )}
 
-    </PortalLayout>
+    </>
   );
 };
 

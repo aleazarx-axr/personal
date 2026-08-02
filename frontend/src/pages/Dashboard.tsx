@@ -1,8 +1,7 @@
 // src/pages/Dashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PortalLayout } from '../components/PortalLayout';
-import { Users, FileText, Clock, CheckCircle, Activity, ArrowRight, ShieldAlert, Plus, FileSignature, ChevronDown } from 'lucide-react';
+import { Users, FileText, Clock, CheckCircle, Activity, ArrowRight, ShieldAlert, Plus, FileSignature, ChevronDown, Wifi, Copy } from 'lucide-react';
 
 interface MetricState {
   activeUsers: number;
@@ -60,14 +59,20 @@ export const Dashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<MetricState>({ activeUsers: 0, pendingDocs: 0, completedDocs: 0, totalDrafts: 0 });
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [networkInfo, setNetworkInfo] = useState({ ip: '', port: '' });
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, docsRes, memosRes] = await Promise.all([
+      const [usersRes, docsRes, memosRes, networkRes] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/api/users`),
         fetch(`${import.meta.env.VITE_API_URL}/api/document-tracking`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/memoranda`)
+        fetch(`${import.meta.env.VITE_API_URL}/api/memoranda`),
+        loggedInUser.role === 'Superuser' ? fetch(`${import.meta.env.VITE_API_URL}/api/system/network-info`) : Promise.resolve(null)
       ]);
+
+      if (networkRes && networkRes.ok) {
+        setNetworkInfo(await networkRes.json());
+      }
 
       if (usersRes.ok && docsRes.ok && memosRes.ok) {
         const users = await usersRes.json();
@@ -111,17 +116,17 @@ export const Dashboard: React.FC = () => {
 
   if (loggedInUser.role === 'Student') {
     return (
-      <PortalLayout pageTitle="Overview">
+      <>
         <div className="bg-[#9B1C1C] text-white p-6 md:p-8 rounded-lg shadow-sm border border-[#7a1515]">
           <h2 className="text-xl font-bold mb-1">Welcome to MyWMSU, {loggedInUser.firstName}!</h2>
           <p className="text-red-100 text-sm">Your student portal access is limited. Please contact administration.</p>
         </div>
-      </PortalLayout>
+      </>
     );
   }
 
   return (
-    <PortalLayout pageTitle="System Command Center">
+    <>
       
       {/* Welcome Banner */}
       <div className="bg-[#9B1C1C] text-white p-6 md:p-8 mb-6 rounded-lg shadow-sm border border-[#7a1515] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -129,10 +134,25 @@ export const Dashboard: React.FC = () => {
           <h2 className="text-xl font-bold mb-1">
             Welcome back, {loggedInUser.firstName} {loggedInUser.lastName}
           </h2>
-          <p className="text-red-100 text-sm font-medium flex items-center">
+          <p className="text-red-100 text-sm font-medium flex items-center mb-3">
             <ShieldAlert className="w-4 h-4 mr-2 opacity-80" />
             Authenticated as {loggedInUser.role}. System is operating normally.
           </p>
+
+          {loggedInUser.role === 'Superuser' && networkInfo.ip && (
+            <div className="inline-flex items-center bg-black/20 rounded-md px-3 py-1.5 text-xs font-mono text-red-50 border border-black/10">
+              <Wifi className="w-3.5 h-3.5 mr-2 opacity-80" />
+              <span>Local Network URL: </span>
+              <span className="font-bold ml-1 tracking-wide">https://{networkInfo.ip}:{networkInfo.port}</span>
+              <button 
+                onClick={() => navigator.clipboard.writeText(`https://${networkInfo.ip}:${networkInfo.port}`)}
+                className="ml-3 p-1 hover:bg-white/10 rounded transition-colors"
+                title="Copy to clipboard"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 w-full md:w-auto">
           <Link to="/document-tracking" className="flex-1 md:flex-none h-[42px] px-4 bg-white text-[#9B1C1C] hover:bg-gray-100 text-sm font-medium flex items-center justify-center transition-colors rounded-md shadow-sm border border-transparent">
@@ -320,6 +340,6 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
-    </PortalLayout>
+    </>
   );
 };

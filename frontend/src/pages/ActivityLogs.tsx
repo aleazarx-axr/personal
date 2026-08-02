@@ -1,6 +1,5 @@
 // src/pages/ActivityLogs.tsx
 import React, { useState, useEffect } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { Search, Activity, AlertCircle, X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 interface Log { 
@@ -71,7 +70,7 @@ export const ActivityLogs: React.FC = () => {
   });
 
   return (
-    <PortalLayout pageTitle="System Audit Trail">
+    <>
       
       {/* Formal Top Right Notification */}
       {notification && (
@@ -184,6 +183,6 @@ export const ActivityLogs: React.FC = () => {
         </table>
       </div>
 
-    </PortalLayout>
+    </>
   );
 };

@@ -1,7 +1,7 @@
 // src/pages/NewsManager.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { PortalLayout } from '../components/PortalLayout';
 import { Newspaper, Plus, Trash2, Edit, Image as ImageIcon, X, Upload, ChevronDown, Save, Search } from 'lucide-react';
+import { UnderDevelopment } from '../components/UnderDevelopment';
 
 // --- CUSTOM OVERLAY DROPDOWN ---
 const CustomSelect = ({ value, onChange, options, className = "h-[42px]", placeholder = "Select..." }: { value: string, onChange: (val: string) => void, options: {value: string, label: string}[], className?: string, placeholder?: string }) => {
@@ -41,6 +41,12 @@ const CustomSelect = ({ value, onChange, options, className = "h-[42px]", placeh
 };
 
 export const NewsManager: React.FC = () => {
+  const user = JSON.parse(localStorage.getItem("portalUser") || "{}");
+  
+  if (user.role !== "Superuser") {
+    return <UnderDevelopment />;
+  }
+
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -150,7 +156,7 @@ export const NewsManager: React.FC = () => {
   const inputClass = "w-full h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#9B1C1C] focus:border-[#9B1C1C] transition-colors";
 
   return (
-    <PortalLayout pageTitle="News & Announcements">
+    <>
       
       {/* --- REFINED HEADER CONTROLS --- */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -437,6 +443,6 @@ export const NewsManager: React.FC = () => {
         </div>
       )}
 
-    </PortalLayout>
+    </>
   );
 };
